@@ -84,7 +84,7 @@ GEMINI_MODEL=
 
 * `GEMINI_API_KEY` — your free AI Studio key. Leave it empty and the app still runs, in
   manual-entry-only mode, with no document text leaving your machine.
-* `GEMINI_MODEL` — the Flash model to call, for example `gemini-3.5-flash`. Pick any
+* `GEMINI_MODEL` — the Flash model to call, for example `gemini-3.8-flash`. Pick any
   current Flash model available on your free tier; check
   <https://ai.google.dev/gemini-api/docs/models> for what is live today. When the
   variable is empty, the single fallback constant `DEFAULT_GEMINI_MODEL` in

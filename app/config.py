@@ -13,7 +13,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 #: Fallback Flash model used when ``GEMINI_MODEL`` is not set.
 #: This is the ONLY place a model id is written down.
-DEFAULT_GEMINI_MODEL = "gemini-3.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
 
 
 class Settings(BaseSettings):

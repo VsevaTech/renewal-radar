@@ -4,7 +4,7 @@
 Not part of the test suite and not run in CI — the automated tests mock the provider
 entirely. Use this once, locally, to confirm your free-tier key and model id work:
 
-    GEMINI_API_KEY=... GEMINI_MODEL=gemini-3.5-flash python scripts/live_check.py
+    GEMINI_API_KEY=... GEMINI_MODEL=gemini-3.8-flash python scripts/live_check.py
 
 With no GEMINI_MODEL set it lists the Flash models your key can actually see, so you
 can copy one into your .env.
