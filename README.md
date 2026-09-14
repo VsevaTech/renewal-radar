@@ -84,7 +84,7 @@ GEMINI_MODEL=
 
 * `GEMINI_API_KEY` — your free AI Studio key. Leave it empty and the app still runs, in
   manual-entry-only mode, with no document text leaving your machine.
-* `GEMINI_MODEL` — the Flash model to call, for example `gemini-3.8-flash`. Pick any
+* `GEMINI_MODEL` — the Flash model to call, for example `gemini-3.5-flash`. Pick any
   current Flash model available on your free tier; check
   <https://ai.google.dev/gemini-api/docs/models> for what is live today. When the
   variable is empty, the single fallback constant `DEFAULT_GEMINI_MODEL` in
@@ -101,12 +101,18 @@ implementing `async def extract(text) -> RenewalExtraction` and return it from
 
 Gemini answers **503 UNAVAILABLE** when a model is busy, which is common on the free
 tier for the newest Flash models. Transient upstream failures (5xx and upstream
-timeouts) are retried with exponential backoff — `AI_MAX_ATTEMPTS`, default 3 — while
-`AI_TIMEOUT_SECONDS` bounds the whole extraction, retries included.
+timeouts) are retried with exponential backoff — `AI_MAX_ATTEMPTS`, default 4, waiting
+2s, 4s then 8s — while `AI_TIMEOUT_SECONDS` bounds the whole extraction, retries
+included.
 
 Quota and rate-limit answers (429) are **never** retried: retrying a rate-limited
-free-tier key only burns the remaining allowance faster. If 503s persist, set
-`GEMINI_MODEL` to a less busy Flash model.
+free-tier key only burns the remaining allowance faster.
+
+The newest Flash model is usually the most contended one. In live testing on a free-tier
+key, `gemini-3.8-flash` answered 503 on every attempt while `gemini-3.5-flash` and
+`gemini-3.6-flash` both completed the same extraction — hence the default. If 503s
+persist for you, point `GEMINI_MODEL` at a different Flash model; the AI only reads the
+document, so the choice does not affect the computed date.
 
 ### When the AI is unavailable
 

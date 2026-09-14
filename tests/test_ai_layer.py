@@ -321,6 +321,18 @@ def test_bad_request_is_never_retried():
     assert models.calls == 1
 
 
+def test_default_backoff_ladder_fits_inside_the_default_timeout():
+    """The retries must not be able to eat the whole budget before the last attempt."""
+    defaults = Settings(gemini_api_key="k")
+    waits = [
+        defaults.ai_retry_backoff_seconds * (2**i) for i in range(defaults.ai_max_attempts - 1)
+    ]
+    assert sum(waits) < defaults.ai_timeout_seconds / 2, (
+        f"backoff ladder {waits} leaves too little of the "
+        f"{defaults.ai_timeout_seconds}s budget for the requests themselves"
+    )
+
+
 def test_retry_backoff_stays_inside_the_overall_timeout():
     """The timeout bounds the whole extraction, retries included."""
     models = _FakeModels(error=_service_unavailable())
