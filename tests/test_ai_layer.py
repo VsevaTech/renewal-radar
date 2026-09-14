@@ -19,6 +19,7 @@ from app.services.ai import (
     AIQuotaError,
     AIResponseError,
     AITimeoutError,
+    AIUnavailableError,
     GeminiRenewalExtractor,
     build_extractor,
     parse_extraction_payload,
@@ -44,22 +45,41 @@ class _FakeResponse:
 
 
 class _FakeModels:
-    def __init__(self, response=None, error: Exception | None = None, delay: float = 0.0):
-        self._response = response
-        self._error = error
+    """Stands in for ``client.aio.models``.
+
+    ``script`` is consumed one entry per call: an exception is raised, anything else is
+    returned. The last entry repeats once the script runs out, so a single error keeps
+    failing every retry.
+    """
+
+    def __init__(
+        self,
+        response=None,
+        error: Exception | None = None,
+        delay: float = 0.0,
+        script: list | None = None,
+    ):
+        if script is None:
+            script = [error if error is not None else response]
+        self._script = script
         self._delay = delay
+        self.calls = 0
         self.last_kwargs: dict | None = None
 
     async def generate_content(self, **kwargs):
         self.last_kwargs = kwargs
+        step = self._script[min(self.calls, len(self._script) - 1)]
+        self.calls += 1
         if self._delay:
             await asyncio.sleep(self._delay)
-        if self._error is not None:
-            raise self._error
-        return self._response
+        if isinstance(step, Exception):
+            raise step
+        return step
 
 
 def _extractor_with(models: _FakeModels, **overrides) -> GeminiRenewalExtractor:
+    # Zero backoff by default so retry tests do not sleep.
+    overrides.setdefault("ai_retry_backoff_seconds", 0.0)
     settings = Settings(gemini_api_key="test-key-not-real", **overrides)
     extractor = GeminiRenewalExtractor.__new__(GeminiRenewalExtractor)
     extractor._settings = settings  # noqa: SLF001 - constructing without a live SDK client
@@ -227,12 +247,88 @@ def test_rate_limit_wording_maps_to_quota_error():
         asyncio.run(_extractor_with(models).extract("contract"))
 
 
-def test_server_error_maps_to_generic_ai_error():
+def test_server_error_maps_to_transient_unavailable():
     error = genai_errors.ServerError(500, {"error": {"message": "internal"}})
     models = _FakeModels(error=error)
-    with pytest.raises(AIError) as excinfo:
+    with pytest.raises(AIUnavailableError) as excinfo:
         asyncio.run(_extractor_with(models).extract("contract"))
     assert not isinstance(excinfo.value, AIQuotaError)
+
+
+# --------------------------------------------------------------------------------------
+# retrying transient failures
+# --------------------------------------------------------------------------------------
+
+
+def _service_unavailable() -> Exception:
+    """The 503 Gemini returns when a Flash model is busy."""
+    return genai_errors.ServerError(
+        503, {"error": {"status": "UNAVAILABLE", "message": "The model is overloaded."}}
+    )
+
+
+def test_503_maps_to_unavailable_and_is_retryable():
+    assert AIUnavailableError.retryable is True
+    assert AITimeoutError.retryable is True
+    assert AIQuotaError.retryable is False
+    assert AIResponseError.retryable is False
+    assert AIError.retryable is False
+
+
+def test_transient_503_is_retried_and_then_succeeds():
+    models = _FakeModels(
+        script=[
+            _service_unavailable(),
+            _service_unavailable(),
+            _FakeResponse(json.dumps(VALID_PAYLOAD)),
+        ]
+    )
+    result = asyncio.run(_extractor_with(models).extract("contract"))
+    assert models.calls == 3
+    assert result.provider == "Example SaaS"
+
+
+def test_persistent_503_gives_up_after_the_configured_attempts():
+    models = _FakeModels(error=_service_unavailable())
+    with pytest.raises(AIUnavailableError):
+        asyncio.run(_extractor_with(models, ai_max_attempts=3).extract("contract"))
+    assert models.calls == 3
+
+
+def test_retry_count_is_configurable():
+    models = _FakeModels(error=_service_unavailable())
+    with pytest.raises(AIUnavailableError):
+        asyncio.run(_extractor_with(models, ai_max_attempts=1).extract("contract"))
+    assert models.calls == 1
+
+
+def test_quota_errors_are_never_retried():
+    """Retrying a rate-limited free-tier key only burns the remaining allowance."""
+    error = genai_errors.ClientError(
+        429, {"error": {"status": "RESOURCE_EXHAUSTED", "message": "Quota exceeded"}}
+    )
+    models = _FakeModels(error=error)
+    with pytest.raises(AIQuotaError):
+        asyncio.run(_extractor_with(models, ai_max_attempts=5).extract("contract"))
+    assert models.calls == 1
+
+
+def test_bad_request_is_never_retried():
+    error = genai_errors.ClientError(400, {"error": {"message": "unsupported model"}})
+    models = _FakeModels(error=error)
+    with pytest.raises(AIError):
+        asyncio.run(_extractor_with(models, ai_max_attempts=5).extract("contract"))
+    assert models.calls == 1
+
+
+def test_retry_backoff_stays_inside_the_overall_timeout():
+    """The timeout bounds the whole extraction, retries included."""
+    models = _FakeModels(error=_service_unavailable())
+    extractor = _extractor_with(
+        models, ai_max_attempts=10, ai_retry_backoff_seconds=5.0, ai_timeout_seconds=0.05
+    )
+    with pytest.raises(AITimeoutError):
+        asyncio.run(extractor.extract("contract"))
 
 
 def test_unexpected_exception_is_wrapped_not_propagated():

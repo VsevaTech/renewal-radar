@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     gemini_model: str = ""
 
     ai_timeout_seconds: float = 45.0
+    #: Total attempts per extraction. Only transient upstream failures (HTTP 5xx,
+    #: upstream timeouts) are retried; quota/rate-limit answers never are.
+    ai_max_attempts: int = 3
+    ai_retry_backoff_seconds: float = 1.0
     max_document_chars: int = 60_000
 
     database_path: str = "./data/renewal_radar.db"

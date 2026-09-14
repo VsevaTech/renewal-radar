@@ -82,6 +82,11 @@ class AIError(RuntimeError):
 
     user_message = AI_UNAVAILABLE_MESSAGE
 
+    #: Whether retrying the same call immediately could plausibly succeed.
+    #: Quota errors are deliberately NOT retryable — retrying a rate-limited free-tier
+    #: key only burns the remaining allowance faster.
+    retryable = False
+
 
 class AINotConfiguredError(AIError):
     """No API key is configured, so the AI path is unavailable by design."""
@@ -94,6 +99,18 @@ class AINotConfiguredError(AIError):
 
 class AITimeoutError(AIError):
     """The provider did not answer within the configured timeout."""
+
+    retryable = True
+
+
+class AIUnavailableError(AIError):
+    """The provider is temporarily overloaded or down (HTTP 5xx).
+
+    Gemini answers 503 UNAVAILABLE when a model is busy, which is common on the free
+    tier for the newest Flash models. These calls are retried with backoff.
+    """
+
+    retryable = True
 
 
 class AIQuotaError(AIError):
@@ -198,30 +215,52 @@ class GeminiRenewalExtractor(RenewalExtractor):
             response_mime_type="application/json",
             response_schema=RenewalExtraction,
             temperature=0.0,
+            # We pass no tools; turning AFC off keeps the SDK from warning about it.
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
 
-    async def extract(self, document_text: str) -> RenewalExtraction:
+    async def _generate_with_retry(self, prompt: str) -> Any:
+        """Call the model, retrying transient upstream failures with backoff."""
         from google.genai import errors as genai_errors
 
+        attempts = max(1, self._settings.ai_max_attempts)
+        for attempt in range(1, attempts + 1):
+            try:
+                return await self._client.aio.models.generate_content(
+                    model=self.model,
+                    contents=prompt,
+                    config=self._config(),
+                )
+            except genai_errors.APIError as exc:
+                mapped = _map_api_error(exc)
+                if not mapped.retryable or attempt == attempts:
+                    raise mapped from exc
+                delay = self._settings.ai_retry_backoff_seconds * (2 ** (attempt - 1))
+                logger.warning(
+                    "Retrying Gemini call after %s (attempt %d/%d, waiting %.1fs)",
+                    type(mapped).__name__,
+                    attempt,
+                    attempts,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+
+        raise AIError("The AI provider call failed.")  # pragma: no cover - loop always returns
+
+    async def extract(self, document_text: str) -> RenewalExtraction:
         prompt = USER_PROMPT_TEMPLATE.format(
             document_text=document_text[: self._settings.max_document_chars]
         )
 
         try:
             response = await asyncio.wait_for(
-                self._client.aio.models.generate_content(
-                    model=self.model,
-                    contents=prompt,
-                    config=self._config(),
-                ),
+                self._generate_with_retry(prompt),
                 timeout=self._settings.ai_timeout_seconds,
             )
         except TimeoutError as exc:
             # Never log `prompt` — it contains the user's document.
             logger.warning("Gemini call timed out after %ss", self._settings.ai_timeout_seconds)
             raise AITimeoutError("The AI provider timed out.") from exc
-        except genai_errors.APIError as exc:
-            raise _map_api_error(exc) from exc
         except AIError:
             raise
         except Exception as exc:  # noqa: BLE001 - the app must not crash on provider bugs
@@ -232,6 +271,8 @@ class GeminiRenewalExtractor(RenewalExtractor):
 
 
 _QUOTA_STATUS_CODES = {429}
+#: 5xx answers that mean "busy, try again" rather than "your request is wrong".
+_TRANSIENT_STATUS_CODES = {500, 502, 503}
 _QUOTA_KEYWORDS = ("quota", "rate limit", "rate_limit", "resource_exhausted", "exhausted")
 
 
@@ -249,6 +290,10 @@ def _map_api_error(exc: Exception) -> AIError:
     if code in {408, 504}:
         logger.warning("Gemini upstream timeout (code=%s)", code)
         return AITimeoutError("The AI provider timed out.")
+
+    if code in _TRANSIENT_STATUS_CODES:
+        logger.warning("Gemini temporarily unavailable (code=%s)", code)
+        return AIUnavailableError("The AI provider is temporarily unavailable.")
 
     logger.warning("Gemini API error (code=%s)", code)
     return AIError("The AI provider returned an error.")
