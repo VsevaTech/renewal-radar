@@ -13,7 +13,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 #: Fallback Flash model used when ``GEMINI_MODEL`` is not set.
 #: This is the ONLY place a model id is written down.
-DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
+DEFAULT_GEMINI_MODEL = "gemini-3.5-flash"
 
 
 class Settings(BaseSettings):
@@ -28,11 +28,13 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = ""
 
-    ai_timeout_seconds: float = 45.0
+    ai_timeout_seconds: float = 60.0
     #: Total attempts per extraction. Only transient upstream failures (HTTP 5xx,
     #: upstream timeouts) are retried; quota/rate-limit answers never are.
-    ai_max_attempts: int = 3
-    ai_retry_backoff_seconds: float = 1.0
+    #: The backoff ladder (2s, 4s, 8s = 14s) is sized to fit inside the timeout above
+    #: alongside the requests themselves.
+    ai_max_attempts: int = 4
+    ai_retry_backoff_seconds: float = 2.0
     max_document_chars: int = 60_000
 
     database_path: str = "./data/renewal_radar.db"
