@@ -97,6 +97,17 @@ All vendor code sits behind the `RenewalExtractor` interface in
 implementing `async def extract(text) -> RenewalExtraction` and return it from
 `build_extractor()`. No route, template or date-maths code changes.
 
+### Retries
+
+Gemini answers **503 UNAVAILABLE** when a model is busy, which is common on the free
+tier for the newest Flash models. Transient upstream failures (5xx and upstream
+timeouts) are retried with exponential backoff — `AI_MAX_ATTEMPTS`, default 3 — while
+`AI_TIMEOUT_SECONDS` bounds the whole extraction, retries included.
+
+Quota and rate-limit answers (429) are **never** retried: retrying a rate-limited
+free-tier key only burns the remaining allowance faster. If 503s persist, set
+`GEMINI_MODEL` to a less busy Flash model.
+
 ### When the AI is unavailable
 
 Quota exhausted, rate-limited, timed out, offline, or answering with malformed JSON —
@@ -219,8 +230,8 @@ GitHub Actions runs lint, format check and the full suite on Python 3.11 and 3.1
 separately builds the Docker image and smoke-tests the running container.
 Covered: fixed renewal date, 30-day notice, 60-day notice, annual renewal, no
 auto-renewal, ambiguous date, missing date, leap-year and year-boundary arithmetic,
-malformed AI responses, AI timeouts, AI quota / rate-limit responses, and that the app
-stays usable through all of them.
+malformed AI responses, AI timeouts, AI quota / rate-limit responses, retry of
+transient 503s, and that the app stays usable through all of them.
 
 ---
 
