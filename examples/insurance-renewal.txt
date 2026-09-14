@@ -1,0 +1,22 @@
+NORTHSTAR INSURANCE GROUP
+Policy renewal notice
+
+Policyholder:   Northwind Trading FZ-LLC
+Policy number:  NS-COM-884213
+Product:        Commercial Combined Insurance
+Premium:        EUR 8,940.00 per annum
+
+Dear Policyholder,
+
+Your policy is due for renewal. Cover will continue automatically from
+1 March 2027 for a further twelve months on the terms set out in the enclosed
+schedule, and the premium shown above will be collected from your registered
+payment method.
+
+If you do not wish the policy to renew, you must notify us no later than 60 days
+prior to the renewal date. Notification received after that point will not prevent
+the renewal from taking effect, although cancellation rights under section 9 of the
+policy wording may still apply.
+
+Yours faithfully,
+Northstar Insurance Group

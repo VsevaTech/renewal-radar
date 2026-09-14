@@ -1,0 +1,23 @@
+FACILITIES SERVICE AGREEMENT
+
+Supplier: Meridian Facilities Services LLC
+Client:   Northwind Trading FZ-LLC
+Contract reference: MFS-2025-0417
+Charges: AED 6,200 per month
+
+3. DURATION
+
+3.1 This Agreement commences on the Commencement Date and continues for an
+    initial period of twenty-four (24) months.
+
+3.2 On expiry of the initial period this Agreement shall terminate and shall not
+    renew automatically. Any continuation of the services beyond the initial period
+    requires a new agreement signed by both parties.
+
+3.3 Either party may terminate during the initial period for material breach in
+    accordance with clause 11.
+
+4. CHARGES
+
+4.1 Charges are invoiced monthly in arrears and are payable within 30 days of
+    the invoice date. The 30-day payment term is not a notice period.

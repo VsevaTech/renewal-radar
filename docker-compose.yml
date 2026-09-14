@@ -1,0 +1,19 @@
+services:
+  web:
+    build: .
+    image: renewal-radar:latest
+    ports:
+      - "8000:8000"
+    environment:
+      # Supplied from .env (see .env.example). Empty values are valid:
+      # the app then runs in manual-entry-only mode.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-45}
+      DATABASE_PATH: /srv/data/renewal_radar.db
+    volumes:
+      - renewal-data:/srv/data
+    restart: unless-stopped
+
+volumes:
+  renewal-data:

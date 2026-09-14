@@ -1,0 +1,23 @@
+MASTER SUBSCRIPTION AGREEMENT
+
+Between: Example SaaS Ltd ("Provider"), 4 Harbour Gate, Dublin 2, Ireland
+And:     Northwind Trading FZ-LLC ("Customer")
+
+Effective date: 15 November 2024
+
+1. SUBSCRIPTION
+1.1 Provider grants Customer a non-exclusive subscription to the Example SaaS Platform
+    for the Initial Term of twelve (12) months commencing on the Effective Date.
+1.2 The subscription fee is USD 14,400 payable annually in advance.
+
+2. TERM AND RENEWAL
+2.1 The agreement renews automatically on 15 November 2026 for a further period of
+    twelve (12) months unless cancelled at least 30 days before renewal.
+2.2 Notice of cancellation must be given in writing to billing@example-saas.test.
+2.3 Fees for a renewal term may be increased by up to 5% on notice.
+
+3. SUPPORT
+3.1 Standard support is included. Priority support is available at additional cost.
+
+4. GOVERNING LAW
+4.1 This agreement is governed by the laws of Ireland.
