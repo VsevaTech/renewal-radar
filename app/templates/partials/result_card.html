@@ -1,0 +1,155 @@
+<article class="result">
+  <p class="source-file">
+    <span class="muted">Source:</span> {{ record.filename }}
+    <span class="pill pill-{{ record.source }}">{{ "AI extraction" if record.source == "ai" else "manual entry" }}</span>
+  </p>
+
+  {% if record.ai_error %}
+    <p class="alert alert-warn" role="status">
+      {% for line in record.ai_error.split("\n") %}{{ line }}<br>{% endfor %}
+    </p>
+    {% if ai_available %}
+      <form method="post" action="/e/{{ record.id }}/retry" hx-post="/e/{{ record.id }}/retry"
+            hx-target="#result" hx-swap="innerHTML">
+        <button type="submit" class="secondary">Retry AI extraction</button>
+      </form>
+    {% endif %}
+  {% endif %}
+
+  {% if status.value == "actionable" %}
+    <div class="verdict verdict-ok">
+      <p class="verdict-label">Cancel by</p>
+      <p class="verdict-date">{{ assessment.cancel_by.strftime("%d %b %Y") }}</p>
+      {% if assessment.days_until_cancel_by is not none %}
+        <p class="verdict-note">
+          {% if assessment.days_until_cancel_by > 0 %}
+            {{ assessment.days_until_cancel_by }} day{{ "s" if assessment.days_until_cancel_by != 1 }} left
+          {% elif assessment.days_until_cancel_by == 0 %}
+            Today is the last day
+          {% else %}
+            {{ -assessment.days_until_cancel_by }} day{{ "s" if assessment.days_until_cancel_by != -1 }} overdue
+          {% endif %}
+        </p>
+      {% endif %}
+      <p class="verdict-formula">
+        {{ extraction.renewal_date.strftime("%d %b %Y") }} − {{ extraction.notice_period_days }} days
+        <span class="muted">(computed locally, not by the AI)</span>
+      </p>
+    </div>
+  {% elif status.value == "no_auto_renewal" %}
+    <div class="verdict verdict-neutral">
+      <p class="verdict-label">No automatic renewal</p>
+      <p class="verdict-note">This agreement does not renew by itself, so there is no cancellation deadline.</p>
+    </div>
+  {% else %}
+    <div class="verdict verdict-warn">
+      <p class="verdict-label">Cancel by</p>
+      <p class="verdict-date">{{ needs_confirmation_label }}</p>
+      <ul class="verdict-reasons">
+        {% for reason in assessment.reasons %}<li>{{ reason }}</li>{% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <dl class="facts">
+    <div><dt>Provider</dt><dd>{{ extraction.provider or needs_confirmation_label }}</dd></div>
+    <div><dt>Auto-renewal</dt>
+      <dd>
+        {% if extraction.auto_renewal is true %}Yes
+        {% elif extraction.auto_renewal is false %}No
+        {% else %}{{ needs_confirmation_label }}{% endif %}
+      </dd>
+    </div>
+    <div><dt>Renewal date</dt>
+      <dd>
+        {% if extraction.renewal_date %}{{ extraction.renewal_date.strftime("%d %b %Y") }}
+        {% else %}{{ needs_confirmation_label }}{% endif %}
+      </dd>
+    </div>
+    <div><dt>Notice period</dt>
+      <dd>{% if extraction.notice_period_days is not none %}{{ extraction.notice_period_days }} days
+        {% else %}{{ needs_confirmation_label }}{% endif %}</dd>
+    </div>
+    <div><dt>Billing period</dt>
+      <dd>{{ extraction.billing_period.value if extraction.billing_period.value != "unknown" else needs_confirmation_label }}</dd>
+    </div>
+    <div><dt>Amount</dt>
+      <dd>{% if extraction.amount is not none %}{{ "%g"|format(extraction.amount) }} {{ extraction.currency or "" }}
+        {% else %}—{% endif %}</dd>
+    </div>
+  </dl>
+
+  <section class="quote-block">
+    <h3>Source quote</h3>
+    {% if extraction.source_quote %}
+      <blockquote>{{ extraction.source_quote }}</blockquote>
+    {% else %}
+      <p class="muted">No supporting quote was found. Check the original document.</p>
+    {% endif %}
+    {% if extraction.notes %}<p class="muted">Note: {{ extraction.notes }}</p>{% endif %}
+  </section>
+
+  <details class="editor" {% if status.value == "needs_confirmation" %}open{% endif %}>
+    <summary>Correct these details manually</summary>
+    <form method="post" action="/e/{{ record.id }}/edit"
+          hx-post="/e/{{ record.id }}/edit" hx-target="#result" hx-swap="innerHTML">
+      <label>Provider
+        <input type="text" name="provider" value="{{ extraction.provider or '' }}">
+      </label>
+      <label>Auto-renewal
+        <select name="auto_renewal">
+          <option value="" {% if extraction.auto_renewal is none %}selected{% endif %}>Unknown</option>
+          <option value="yes" {% if extraction.auto_renewal is true %}selected{% endif %}>Yes</option>
+          <option value="no" {% if extraction.auto_renewal is false %}selected{% endif %}>No</option>
+        </select>
+      </label>
+      <label>Renewal date
+        <input type="date" name="renewal_date"
+               value="{{ extraction.renewal_date.isoformat() if extraction.renewal_date else '' }}">
+      </label>
+      <label>Notice period (days)
+        <input type="number" name="notice_period_days" min="0" step="1"
+               value="{{ extraction.notice_period_days if extraction.notice_period_days is not none else '' }}">
+      </label>
+      <label>Billing period
+        <select name="billing_period">
+          {% for period in billing_periods %}
+            <option value="{{ period.value }}" {% if period == extraction.billing_period %}selected{% endif %}>{{ period.value }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Amount
+        <input type="text" name="amount" inputmode="decimal"
+               value="{{ '%g'|format(extraction.amount) if extraction.amount is not none else '' }}">
+      </label>
+      <label>Currency
+        <input type="text" name="currency" maxlength="3" value="{{ extraction.currency or '' }}">
+      </label>
+      <label class="wide">Source quote
+        <textarea name="source_quote" rows="3">{{ extraction.source_quote or '' }}</textarea>
+      </label>
+      <button type="submit">Save corrections</button>
+    </form>
+  </details>
+
+  <div class="actions">
+    {% if status.value == "actionable" %}
+      {% if record.confirmed %}
+        <a class="button" href="/e/{{ record.id }}/reminder.ics" download>Download reminder.ics</a>
+        <span class="confirmed-note">Confirmed ✓</span>
+      {% else %}
+        <form method="post" action="/e/{{ record.id }}/confirm"
+              hx-post="/e/{{ record.id }}/confirm" hx-target="#result" hx-swap="innerHTML">
+          <button type="submit">These details are correct — confirm</button>
+        </form>
+      {% endif %}
+    {% else %}
+      <p class="muted">
+        A reminder can be exported once a renewal date and a notice period are confirmed.
+      </p>
+    {% endif %}
+    <form method="post" action="/e/{{ record.id }}/delete" class="delete-form">
+      <button type="submit" class="danger">Delete this document</button>
+    </form>
+  </div>
+</article>

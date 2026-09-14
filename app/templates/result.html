@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ extraction.provider or "Extraction" }} · Renewal Radar{% endblock %}
+{% block content %}
+<p class="breadcrumb"><a href="/">← Analyse another document</a></p>
+<div id="result">
+  {% include "partials/result_card.html" %}
+</div>
+{% endblock %}

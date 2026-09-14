@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Renewal Radar{% endblock %}</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">◎</span>
+      <span>Renewal Radar</span>
+    </a>
+    <p class="tagline">Find the auto-renewal clause. Know the last safe day to cancel.</p>
+  </header>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <p class="disclaimer">
+      <strong>Renewal Radar is an assistant, not legal advice.</strong>
+      Always verify extracted contract terms against the original document.
+    </p>
+    <p class="meta">
+      {% if ai_available %}
+        AI extraction: {{ ai_provider_name }} · <code>{{ ai_model }}</code> ·
+        document text is sent to this provider.
+      {% else %}
+        AI extraction is off — manual entry only. No document text leaves this machine.
+      {% endif %}
+    </p>
+  </footer>
+</body>
+</html>

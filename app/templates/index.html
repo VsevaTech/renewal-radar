@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="intro">
+  <h1>Upload a contract or invoice</h1>
+  <p>
+    Renewal Radar reads the document, finds the automatic-renewal and notice-period
+    clauses, quotes the exact sentence it relied on, and then computes the last safe
+    cancellation date in plain Python — the AI never does the date maths.
+  </p>
+</section>
+
+{% if error %}
+  <p class="alert alert-error" role="alert">{{ error }}</p>
+{% endif %}
+
+{% if not ai_available %}
+  <p class="alert alert-warn" role="status">
+    AI extraction is not configured on this instance.<br>
+    You can still enter the renewal details manually after submitting a document.
+  </p>
+{% endif %}
+
+<div class="cards">
+  <form class="card" method="post" action="/extract" enctype="multipart/form-data">
+    <h2>1 · Upload a file</h2>
+    <p class="hint">PDF, DOCX or plain text, up to 10&nbsp;MB.</p>
+    <input type="file" name="document" accept=".pdf,.docx,.txt,.md,application/pdf,text/plain"
+           required>
+    <button type="submit">Detect renewal terms</button>
+  </form>
+
+  <form class="card" method="post" action="/extract">
+    <h2>2 · …or paste the text</h2>
+    <p class="hint">Paste the renewal clause or the whole agreement.</p>
+    <textarea name="pasted_text" rows="8" required
+      placeholder="The agreement renews automatically on 15 November 2026 unless cancelled at least 30 days before renewal.">{{ pasted_text or "" }}</textarea>
+    <button type="submit">Detect renewal terms</button>
+  </form>
+</div>
+
+{% if recent %}
+<section class="recent">
+  <h2>Recent documents</h2>
+  <ul>
+    {% for item in recent %}
+      <li>
+        <a href="/e/{{ item.id }}">{{ item.filename }}</a>
+        <span class="muted">{{ item.created_at.strftime("%d %b %Y %H:%M") }} UTC</span>
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}
